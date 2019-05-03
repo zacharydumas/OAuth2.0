@@ -1,13 +1,23 @@
-from flask import Flask, render_template, request, redirect,jsonify, url_for, flash
+#!/usr/bin/env python2 
+#
+#
+from flask import Flask, render_template, request, redirect,jsonify, url_for, flash, make_response
 app = Flask(__name__)
 
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Restaurant, MenuItem
+from flask import session as login_session
+import random, string
+from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
+import httplib2
+import json
+import requests
 
+CLIENT_ID = json.loads(open('client_secrets.json', 'r').read())['web']['client_id']
 
 #Connect to Database and create database session
-engine = create_engine('sqlite:///restaurantmenu.db')
+engine = create_engine('sqlite:///restaurantmenu.db', connect_args={'check_same_thread': False})
 Base.metadata.bind = engine
 
 DBSession = sessionmaker(bind=engine)
@@ -137,7 +147,31 @@ def deleteMenuItem(restaurant_id,menu_id):
         return render_template('deleteMenuItem.html', item = itemToDelete)
 
 
+@app.route('/login')
+def showLogin():
+  state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+  login_session['state'] = state
+  return render_template('login.html', STATE=state)
 
+@app.route('/gconnect', methods=['POST'])
+def gconnect():
+  if request.args.get('state') != login_session['state']:
+    response = make_response(json.dumps('Invalid state parameter'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  code = request.data
+  try:
+    oauth_flow = flow_from_clientsecrets('client_secrets.json',scope='')
+    oauth_flow.redirect_uri = 'postmessage'
+    credentials = oauth_flow.step2_exchange(code)
+  except FlowExchangeError:
+    response = make_response(json.dumps('Failed to upgrade the authorization code.'), 401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  access_token = credentials.access_token
+  url = ('https://googleapis.com/oauth2/v1/tokeninfo?access_token=%s' % access_token)
+  h = httplib2.Http()
+  result = json.loads(h.request(url, 'GET')[1])
 
 if __name__ == '__main__':
   app.secret_key = 'super_secret_key'
