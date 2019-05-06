@@ -163,7 +163,7 @@ def gconnect():
   try:
     oauth_flow = flow_from_clientsecrets('client_secrets.json',scope='')
     oauth_flow.redirect_uri = 'postmessage'
-    credentials = oauth_flow.step2_exchange(code)
+    credentials = oauth_flow.step2_exchange(code) #exchanges one time code for token
   except FlowExchangeError:
     response = make_response(json.dumps('Failed to upgrade the authorization code.'), 401)
     response.headers['Content-Type'] = 'application/json'
@@ -172,6 +172,31 @@ def gconnect():
   url = ('https://googleapis.com/oauth2/v1/tokeninfo?access_token=%s' % access_token)
   h = httplib2.Http()
   result = json.loads(h.request(url, 'GET')[1])
+  if result.get('error') is not None:
+    response = make_response(json.dumps(result.get('error')), 500)
+    response.headers['Content-Type'] = 'application/json'
+  gplus_id = credentials.id_token['sub']
+  if result['user_id'] != gplus_id:
+    response = make_response(json.dumps("Token's user ID doesn't match given user ID."),401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  if result['issued_to'] != CLIENT_ID:
+    response = make_response(json.dumps("Token's client ID doesn't match app's."),401)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+  stored_credentials = login_session.get('credentials')
+  stored_gplus_id = login_session.get('gplus_id')
+  if stored_credentials is not None and gplus_id == stored_gplus_id:
+    response = make_response(json.dumps('Current user is already connected.'),200)
+    response.headers['Content-Type'] = 'application/json'
+  login_session['credentials'] = credentials
+  login_session['gplus_id'] = gplus_id
+
+  userinfo_url = "http://www.googleapis.com/oauth2/v1/userinfo"
+  params = {'access_token': credentials.access_token, 'alt': 'json'}
+  answer = requests.get(userinfo_url, params=params)
+  data = json.loads(answer.text)
+  
 
 if __name__ == '__main__':
   app.secret_key = 'super_secret_key'
