@@ -196,7 +196,17 @@ def gconnect():
   params = {'access_token': credentials.access_token, 'alt': 'json'}
   answer = requests.get(userinfo_url, params=params)
   data = json.loads(answer.text)
-  
+  login_session['username'] = data["name"]
+  login_session['picture'] = data["picture"]
+  login_session['email'] = data["email"]
+
+  output = ''
+  output += '<h1>Welcome, '
+  output += login_session['picture']
+  output += ' "style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius:150px;-moz-border-radius:150px;">'
+  flash("you are now logged in as %s"%login_session['username'])
+  return output
+
 
 if __name__ == '__main__':
   app.secret_key = 'super_secret_key'
