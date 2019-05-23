@@ -9,7 +9,8 @@ from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Restaurant, MenuItem
 from flask import session as login_session
 import random, string
-from oauth2client.client import flow_from_clientsecrets, FlowExchangeError
+from oauth2client.client import flow_from_clientsecrets
+from oauth2client.client import FlowExchangeError
 import httplib2
 import json
 import requests
